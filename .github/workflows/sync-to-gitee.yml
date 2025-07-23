@@ -1,0 +1,34 @@
+name: 🔄 Sync to Gitee
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    name: 🌉 GitSync-Bridge to Gitee
+    steps:
+    - name: 📥 Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: 🔄 Mirror to Gitee
+      uses: Yikun/hub-mirror-action@master
+      with:
+        src: github/${{ vars.GITHUB_USERNAME }}/${{ vars.GITHUB_REPO }}
+        dst: gitee/${{ vars.GITEE_USERNAME }}/${{ vars.GITEE_REPO }}
+        dst_key: ${{ secrets.GITEE_PRIVATE_KEY }}
+        dst_token: ${{ secrets.GITEE_PASSWORD }}
+        force_update: true
+        debug: true
+
+    - name: 🚀 Build Gitee Pages
+      uses: yanglbme/gitee-pages-action@main
+      with:
+        gitee-username: ${{ vars.GITEE_USERNAME }}
+        gitee-password: ${{ secrets.GITEE_PASSWORD }}
+        gitee-repo: ${{ vars.GITEE_USERNAME }}/${{ vars.GITEE_REPO }}
+        branch: main

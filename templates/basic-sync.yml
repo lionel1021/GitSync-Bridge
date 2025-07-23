@@ -1,0 +1,148 @@
+# 🌉 GitSync-Bridge 基础同步模板
+# 适用于大多数项目的简单双向同步配置
+
+name: 🔄 Basic Sync
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+env:
+  # 配置环境变量 (请根据实际情况修改)
+  GITHUB_USERNAME: ${{ github.repository_owner }}
+  GITHUB_REPO: ${{ github.event.repository.name }}
+  GITEE_USERNAME: ${{ vars.GITEE_USERNAME }}  # 在Repository Variables中配置
+  GITEE_REPO: ${{ vars.GITEE_REPO }}          # 在Repository Variables中配置
+
+jobs:
+  # Job 1: GitHub → Gitee 同步
+  github-to-gitee:
+    if: github.event_name == 'push'  # 只在push时触发
+    runs-on: ubuntu-latest
+    name: 📤 GitHub to Gitee
+    
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # 获取完整历史
+        
+    - name: 🔄 Mirror to Gitee
+      uses: Yikun/hub-mirror-action@master
+      with:
+        src: github/${{ env.GITHUB_USERNAME }}/${{ env.GITHUB_REPO }}
+        dst: gitee/${{ env.GITEE_USERNAME }}/${{ env.GITEE_REPO }}
+        dst_key: ${{ secrets.GITEE_PRIVATE_KEY }}
+        dst_token: ${{ secrets.GITEE_PASSWORD }}
+        force_update: true
+        debug: false  # 生产环境建议关闭debug
+        timeout: 600  # 10分钟超时
+        
+    - name: ✅ Sync completed
+      run: |
+        echo "🎉 GitHub → Gitee 同步完成"
+        echo "📊 同步时间: $(date)"
+        echo "📦 源仓库: https://github.com/${{ env.GITHUB_USERNAME }}/${{ env.GITHUB_REPO }}"
+        echo "📦 目标仓库: https://gitee.com/${{ env.GITEE_USERNAME }}/${{ env.GITEE_REPO }}"
+
+  # Job 2: 定时从Gitee拉取更新
+  gitee-to-github:
+    runs-on: ubuntu-latest
+    name: 📥 Gitee to GitHub
+    # 只在定时触发或手动触发时运行
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+    - name: 📥 Checkout GitHub repository  
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+        
+    - name: ⚙️ Configure Git
+      run: |
+        git config --global user.name "GitSync-Bridge[bot]"
+        git config --global user.email "gitsync-bridge@noreply.github.com"
+        
+    - name: 🔗 Add Gitee remote
+      run: |
+        # 添加Gitee远程仓库
+        git remote add gitee https://${{ env.GITEE_USERNAME }}:${{ secrets.GITEE_PASSWORD }}@gitee.com/${{ env.GITEE_USERNAME }}/${{ env.GITEE_REPO }}.git || true
+        
+        # 验证远程仓库
+        git remote -v
+        
+    - name: 📡 Fetch from Gitee
+      run: |
+        echo "🔄 从Gitee获取最新更改..."
+        git fetch gitee main --depth=10  # 获取最近10个提交
+        
+    - name: 🔍 Check for differences
+      id: diff_check
+      run: |
+        # 比较本地和远程的差异
+        if git diff --quiet HEAD gitee/main; then
+          echo "📄 没有发现新的更改"
+          echo "has_changes=false" >> $GITHUB_OUTPUT
+        else
+          echo "🔄 发现Gitee有新的更改，准备同步"
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+          
+          # 显示差异摘要
+          echo "📊 变更摘要:"
+          git log --oneline --graph HEAD..gitee/main | head -10
+        fi
+        
+    - name: 🔄 Merge changes
+      if: steps.diff_check.outputs.has_changes == 'true'
+      run: |
+        echo "🔀 合并Gitee的更改..."
+        
+        # 尝试自动合并
+        if git merge gitee/main --no-edit --message "🌉 GitSync-Bridge: 自动同步来自Gitee的更改 ($(date))"; then
+          echo "✅ 自动合并成功"
+        else
+          echo "⚠️ 检测到合并冲突"
+          
+          # 简单的冲突解决策略：使用Gitee版本
+          git checkout --theirs .
+          git add .
+          git commit -m "🔧 GitSync-Bridge: 解决合并冲突，使用Gitee版本 ($(date))"
+          
+          echo "🔧 冲突已自动解决"
+        fi
+        
+    - name: 📤 Push to GitHub
+      if: steps.diff_check.outputs.has_changes == 'true'
+      run: |
+        echo "📤 推送更改到GitHub..."
+        git push origin main
+        echo "✅ Gitee → GitHub 同步完成"
+        
+    - name: 📊 Sync report
+      run: |
+        echo "🌉 GitSync-Bridge 同步报告"
+        echo "=========================="
+        echo "🕒 执行时间: $(date)"
+        echo "🔄 同步状态: ${{ steps.diff_check.outputs.has_changes == 'true' && '有更改已同步' || '无更改需要同步' }}"
+        echo "📦 GitHub仓库: ${{ github.repository }}"
+        echo "📦 Gitee仓库: ${{ env.GITEE_USERNAME }}/${{ env.GITEE_REPO }}"
+
+# 定时任务配置 (添加到单独的workflow文件中)
+---
+name: 🕒 Scheduled Sync
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # 每6小时运行一次
+  workflow_dispatch:       # 允许手动触发
+
+jobs:
+  scheduled-pull:
+    uses: ./.github/workflows/basic-sync.yml  # 调用基础同步workflow
+    secrets: inherit
+    with:
+      sync_direction: "gitee-to-github"

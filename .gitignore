@@ -1,0 +1,149 @@
+# GitSync-Bridge .gitignore
+
+# 系统文件
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE和编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 日志文件
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 运行时数据
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# 依赖目录
+node_modules/
+bower_components/
+
+# 构建输出
+dist/
+build/
+out/
+.next/
+
+# 环境配置
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 缓存
+.cache/
+.npm
+.eslintcache
+.parcel-cache
+
+# 测试覆盖率
+coverage/
+*.lcov
+.nyc_output
+
+# Git相关
+*.orig
+*.rej
+
+# 临时文件
+*.tmp
+*.temp
+temp/
+tmp/
+
+# 压缩文件
+*.zip
+*.tar.gz
+*.rar
+
+# 密钥文件 (安全考虑)
+*.pem
+*.key
+*.p12
+*.p8
+id_rsa*
+id_ed25519*
+
+# 配置文件中的敏感信息
+secrets.yml
+config/secrets.yml
+.secrets
+
+# GitSync-Bridge 特定文件
+sync-debug.log
+sync-status.json
+.gitsync/
+
+# 备份文件
+*.backup
+*.bak
+
+# 文档生成
+_site/
+.jekyll-cache/
+.sass-cache/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# Ruby
+*.gem
+*.rbc
+/.config
+/coverage/
+/InstalledFiles
+/pkg/
+/spec/reports/
+/spec/examples.txt
+/test/tmp/
+/test/version_tmp/
+/tmp/
+
+# Java
+*.class
+*.jar
+*.war
+*.ear
+hs_err_pid*
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Rust
+target/
+Cargo.lock
+
+# 其他常见文件
+.sass-cache
+.jekyll-metadata
+.bundle
+vendor

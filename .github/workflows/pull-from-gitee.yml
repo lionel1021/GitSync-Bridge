@@ -1,0 +1,92 @@
+name: 🔽 Pull from Gitee
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'  # 每15分钟检查一次
+  workflow_dispatch:
+
+jobs:
+  pull:
+    runs-on: ubuntu-latest
+    name: 🌉 GitSync-Bridge from Gitee
+    steps:
+    - name: 📥 Checkout GitHub repo
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+        
+    - name: ⚙️ Setup Git Config
+      run: |
+        git config --global user.name "GitSync-Bridge[bot]"
+        git config --global user.email "gitsync-bridge@noreply.github.com"
+        
+    - name: 🔗 Add Gitee remote and fetch
+      env:
+        GITEE_TOKEN: ${{ secrets.GITEE_PASSWORD }}
+        GITEE_USERNAME: ${{ vars.GITEE_USERNAME }}
+        GITEE_REPO: ${{ vars.GITEE_REPO }}
+      run: |
+        # 添加Gitee远程仓库
+        git remote add gitee https://${GITEE_USERNAME}:${GITEE_TOKEN}@gitee.com/${GITEE_USERNAME}/${GITEE_REPO}.git || true
+        
+        # 获取Gitee最新代码
+        git fetch gitee main
+        
+    - name: 🔍 Check for differences
+      id: check_diff
+      run: |
+        # 检查是否有差异
+        if git diff --quiet HEAD gitee/main; then
+          echo "has_changes=false" >> $GITHUB_OUTPUT
+          echo "📄 没有发现新的更改"
+        else
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+          echo "🔄 发现Gitee有新的更改，准备同步"
+          
+          # 显示变更摘要
+          echo "📊 变更摘要:"
+          git log --oneline HEAD..gitee/main | head -5
+        fi
+        
+    - name: 🔄 Merge and push changes
+      if: steps.check_diff.outputs.has_changes == 'true'
+      run: |
+        # 合并Gitee的更改
+        git merge gitee/main --no-edit -m "🌉 GitSync-Bridge: 自动同步来自Gitee的更改 ($(date))"
+        
+        # 推送到GitHub
+        git push origin main
+        
+        echo "✅ 成功同步Gitee更改到GitHub"
+        
+    - name: 📊 Log sync status
+      run: |
+        echo "🌉 GitSync-Bridge 同步状态报告"
+        echo "=================================="
+        echo "🕒 同步时间: $(date)"
+        echo "📦 GitHub仓库: ${{ github.repository }}"
+        echo "📦 Gitee仓库: ${{ vars.GITEE_USERNAME }}/${{ vars.GITEE_REPO }}"
+        echo "🔄 是否有更改: ${{ steps.check_diff.outputs.has_changes }}"
+        echo "✅ 同步完成"
+        
+    - name: 📧 Notify on failure
+      if: failure()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: '🚨 GitSync-Bridge 同步失败',
+            body: `## 🚨 同步失败报告
+            
+            **时间**: ${new Date().toLocaleString('zh-CN')}
+            **方向**: Gitee → GitHub
+            **工作流**: ${{ github.workflow }}
+            **运行ID**: ${{ github.run_id }}
+            
+            请检查GitHub Actions日志获取详细错误信息。
+            
+            [查看日志](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`
+          });
